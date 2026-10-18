@@ -1,0 +1,5 @@
+version,metric,mean,std,p50,p99,max,n
+Motor,jitter,1967.79,478.181,2000.5,3230.57,3570.2,3
+Baseline,jitter,1981.96,748.755,2003.8,3500.27,3661.37,3
+Motor,sync_gap_us,806.797,0,681.667,2460.8,7199,3
+Baseline,sync_gap_us,869.438,0,646.767,2712.53,3940.73,3

@@ -1,0 +1,23 @@
+{
+  "timestamp_unix": 1792312071,
+  "n_ticks": 2000,
+  "n_measurements": 4,
+  "motor": {
+    "mean_us": 652.003,
+    "std_us":  644.584,
+    "min_us":  6.1,
+    "p50_us":  555.4,
+    "p99_us":  2650.3,
+    "max_us":  12859.5,
+    "n":       2000
+  },
+  "baseline": {
+    "mean_us": 1000.53,
+    "std_us":  2676.75,
+    "min_us":  178.8,
+    "p50_us":  336.9,
+    "p99_us":  12858.6,
+    "max_us":  14403.6,
+    "n":       2000
+  }
+}

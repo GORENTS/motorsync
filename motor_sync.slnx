@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="motor_sync.vcxproj" Id="c309da8e-ee1f-4403-a8af-2abcffc64d7c" />
+</Solution>
