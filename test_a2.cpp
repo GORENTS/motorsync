@@ -1,12 +1,13 @@
 // test_a2.cpp
 // =====================================================================
-// ТЕСТ A2: разная нагрузка.
-//   1 тяжёлое измерение (~800 us) + 3 лёгких (~50 us).
-//   Период 2000 us, 1000 кадров × 10 прогонов.
+// TEST A2: heterogeneous load (1 heavy ~800 us + 3 light ~50 us).
+// Period 2000 us, 1000 frames × 10 runs.
 //
-// Метрики:
-//   - jitter главного потока (std).
-//   - commit gap: max(t_commit_i) - min(t_commit_i) на каждом кадре.
+// Metrics:
+//   - commit gap: max(t_commit_i) - min(t_commit_i) per frame
+//   - jitter of the main thread
+//
+// v2: LCG-based load (deterministic, not optimized away).
 // =====================================================================
 
 #ifdef _WIN32
@@ -23,7 +24,6 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
@@ -32,21 +32,26 @@
 #include <vector>
 
 // ---------------------------------------------------------------------
-// Нагрузка
+// LCG load: deterministic, CPU-bound, not optimized away.
 // ---------------------------------------------------------------------
 void heavy_work() {
-    volatile double x = 0.0;
-    for (int i = 0; i < 80000; ++i) x += std::sin(i * 0.0001);
+    std::uint64_t x = 1;
+    for (std::uint64_t i = 0; i < 4'000'000ULL; ++i) {
+        x = x * 1664525ULL + 1013904223ULL;
+    }
     (void)x;
 }
+
 void light_work() {
-    volatile double x = 0.0;
-    for (int i = 0; i < 5000; ++i) x += std::sin(i * 0.0001);
+    std::uint64_t x = 1;
+    for (std::uint64_t i = 0; i < 200'000ULL; ++i) {
+        x = x * 1664525ULL + 1013904223ULL;
+    }
     (void)x;
 }
 
 // ---------------------------------------------------------------------
-// Commit gap: max(t_commit) - min(t_commit) на каждом кадре
+// Commit gap statistics
 // ---------------------------------------------------------------------
 struct SyncStats {
     double mean_gap_us = 0;
@@ -88,10 +93,10 @@ SyncStats compute_commit_gap(
 }
 
 void print_sync(const char* name, const SyncStats& s) {
-    std::printf("%-10s mean_gap=%7.2f | p50_gap=%7.2f | p99_gap=%8.2f | "
-        "max_gap=%9.2f | n=%zu\n",
-        name, s.mean_gap_us, s.p50_gap_us, s.p99_gap_us,
-        s.max_gap_us, s.n);
+    std::printf("%-10s mean_gap=%8.2f | p50_gap=%8.2f | "
+        "p99_gap=%9.2f | max_gap=%10.2f | n=%zu\n",
+        name, s.mean_gap_us, s.p50_gap_us,
+        s.p99_gap_us, s.max_gap_us, s.n);
 }
 
 // ---------------------------------------------------------------------
@@ -166,7 +171,7 @@ int main() {
         }
     }
 
-    // ===== Агрегат =====
+    // Aggregate
     auto avg = [](const std::vector<SyncStats>& runs) {
         SyncStats a;
         if (runs.empty()) return a;
@@ -200,7 +205,7 @@ int main() {
     else if (imp > 10.0) std::puts("VERDICT: Motor is more atomic.");
     else std::puts("VERDICT: No significant improvement.");
 
-    // ===== CSV =====
+    // CSV
     {
         std::ofstream f("test_a2_results.csv");
         f << "version,metric,mean,p50,p99,max,n\n";

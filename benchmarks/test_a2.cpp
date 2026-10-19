@@ -115,7 +115,7 @@ int main() {
 
         // ===== Motor =====
         {
-            std::atomic<double> shared{ 0.0 };
+            std::atomic<std::uint64_t> shared{ 0 };
             std::vector<std::vector<std::int64_t>> ts_motor(N_MEAS);
             for (auto& v : ts_motor) v.reserve(N_TICKS);
 
@@ -141,7 +141,7 @@ int main() {
 
         // ===== Baseline =====
         {
-            std::atomic<double> shared{ 0.0 };
+            std::atomic<std::uint64_t> shared{ 0 };
             std::vector<std::vector<std::int64_t>> ts_naive(N_MEAS);
             for (auto& v : ts_naive) v.reserve(N_TICKS);
 
@@ -152,7 +152,7 @@ int main() {
                         if (i == 0) heavy_work(); else light_work();
                     },
                     [&shared, &ts_naive, i](std::uint64_t, int) {
-                        shared.fetch_add(1.0);
+                        shared.fetch_add(1);
                         auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::steady_clock::now().time_since_epoch()).count();
                         ts_naive[i].push_back(now);

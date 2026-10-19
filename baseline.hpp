@@ -1,6 +1,7 @@
 // baseline.hpp
 // =====================================================================
-// Наивная реализация: без барьера, commit сразу после work.
+// Naive implementation: no barrier, commit right after work.
+// Version 5: supports zero period (Test C).
 // =====================================================================
 #pragma once
 
@@ -33,21 +34,25 @@ namespace baseline {
         }
 
         void run() {
+            const bool use_period = period_.count() > 0;
+            const auto spin_window = std::chrono::microseconds(100);
+
             for (std::size_t i = 0; i < works_.size(); ++i) {
-                threads_.emplace_back([this, i] {
+                threads_.emplace_back([this, i, use_period, spin_window] {
                     auto next = std::chrono::steady_clock::now();
-                    const auto spin_window = std::chrono::microseconds(100);
 
                     for (std::uint64_t t = 0; t < max_ticks_; ++t) {
-                        next += period_;
+                        if (use_period) next += period_;
                         works_[i](t, static_cast<int>(i));
-                        commits_[i](t, static_cast<int>(i));   // без барьера!
+                        commits_[i](t, static_cast<int>(i));
 
-                        auto sleep_target = next - spin_window;
-                        if (sleep_target > std::chrono::steady_clock::now()) {
-                            std::this_thread::sleep_until(sleep_target);
+                        if (use_period) {
+                            auto sleep_target = next - spin_window;
+                            if (sleep_target > std::chrono::steady_clock::now()) {
+                                std::this_thread::sleep_until(sleep_target);
+                            }
+                            while (std::chrono::steady_clock::now() < next) {}
                         }
-                        while (std::chrono::steady_clock::now() < next) {}
                     }
                     });
             }

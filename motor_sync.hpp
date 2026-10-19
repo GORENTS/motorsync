@@ -1,11 +1,14 @@
 // motor_sync.hpp
 // =====================================================================
-// MotorSync: библиотека моторного измерения C++17. Версия 6.
+// MotorSync: synchronization library for frame-based simulations (C++17).
+// Version 7.
 //
-// Режимы:
-//   - sequential_commit=false: барьер, но commit гонкой (как в A2).
-//   - sequential_commit=true:  барьер + commit в порядке 0→1→2→3.
-//     Это гарантирует детерминизм (тест B).
+// Modes:
+//   - sequential_commit=false: barrier, commit in race (Test A2).
+//   - sequential_commit=true:  barrier + commit strictly in order 0→1→...→N-1
+//                              (guarantees determinism, Test B).
+//
+// Period = 0 disables sleep/spin (used by Test C for throughput).
 // =====================================================================
 #pragma once
 
@@ -20,6 +23,14 @@
 
 namespace motor {
 
+    /**
+     * @class TickBarrier
+     * @brief Barrier for N participants.
+     *
+     * The last arriving thread releases all others. Order of arrival
+     * does not matter; all N participants must call wait() before any
+     * can proceed.
+     */
     class TickBarrier {
         std::mutex mtx_;
         std::condition_variable cv_;
@@ -29,6 +40,7 @@ namespace motor {
 
     public:
         explicit TickBarrier(std::size_t n) : n_(n) {}
+
         void wait() {
             std::unique_lock<std::mutex> lk(mtx_);
             const std::size_t gen = generation_;
@@ -44,6 +56,20 @@ namespace motor {
 
     using MeasurementFn = std::function<void(std::uint64_t tick, int id)>;
 
+    /**
+     * @class Motor
+     * @brief Processor that builds frames with synchronized measurements.
+     *
+     * @guarantee All work-phases complete before any commit-phase begins
+     *            (TickBarrier includes main thread, n_measurements + 1).
+     * @guarantee With sequential_commit=true, commits happen strictly in
+     *            order 0,1,...,N-1 (deterministic, verified by Test B).
+     * @guarantee If target_period > 0, each frame duration is held with
+     *            sleep_until + spin-wait (precision ~1 us on Windows with
+     *            timeBeginPeriod(1); ~10 us on Linux/macOS without).
+     * @guarantee If target_period == 0, no sleep/spin is performed: the
+     *            Motor runs at maximum throughput (Test C).
+     */
     class Motor {
         std::vector<MeasurementFn> works_;
         std::vector<MeasurementFn> commits_;
@@ -53,7 +79,7 @@ namespace motor {
         std::chrono::microseconds target_period_;
         bool sequential_commit_;
 
-        // Для sequential commit:
+        // Sequential commit state
         std::mutex commit_mtx_;
         std::condition_variable commit_cv_;
         std::size_t next_committer_ = 0;
@@ -84,7 +110,6 @@ namespace motor {
                         barrier_.wait();
 
                         if (sequential_commit_) {
-                            // Ждём своей очереди (0 → 1 → 2 → 3 → 0)
                             std::unique_lock<std::mutex> lk(commit_mtx_);
                             commit_cv_.wait(lk, [&] {
                                 return next_committer_ == i;
@@ -94,7 +119,6 @@ namespace motor {
                             commit_cv_.notify_all();
                         }
                         else {
-                            // Без порядка — commit в гонке (для A2)
                             commits_[i](t, static_cast<int>(i));
                         }
                     }
@@ -103,16 +127,19 @@ namespace motor {
 
             auto next_target = std::chrono::steady_clock::now();
             const auto spin_window = std::chrono::microseconds(100);
+            const bool use_period = target_period_.count() > 0;
 
             for (std::uint64_t t = 0; t < max_ticks_; ++t) {
-                next_target += target_period_;
+                if (use_period) next_target += target_period_;
                 barrier_.wait();
 
-                auto sleep_target = next_target - spin_window;
-                if (sleep_target > std::chrono::steady_clock::now()) {
-                    std::this_thread::sleep_until(sleep_target);
+                if (use_period) {
+                    auto sleep_target = next_target - spin_window;
+                    if (sleep_target > std::chrono::steady_clock::now()) {
+                        std::this_thread::sleep_until(sleep_target);
+                    }
+                    while (std::chrono::steady_clock::now() < next_target) {}
                 }
-                while (std::chrono::steady_clock::now() < next_target) {}
             }
 
             for (auto& th : threads_) if (th.joinable()) th.join();
