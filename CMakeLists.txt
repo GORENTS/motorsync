@@ -35,6 +35,11 @@ target_link_libraries(test_b PRIVATE Threads::Threads ${PLATFORM_LIBS})
 add_executable(test_c benchmarks/test_c.cpp)
 target_link_libraries(test_c PRIVATE Threads::Threads ${PLATFORM_LIBS})
 
+
+# --- examples ---
+add_executable(world_model examples/world_model.cpp)
+target_link_libraries(world_model PRIVATE Threads::Threads ${PLATFORM_LIBS})
+
 # --- Run all ---
 add_custom_target(run_all
     COMMAND test_a2
@@ -44,3 +49,5 @@ add_custom_target(run_all
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Running all benchmarks..."
 )
+
+#set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT world_model)

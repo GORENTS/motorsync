@@ -50,11 +50,11 @@ int main() {
 
 | Metric | Motor | Baseline | Improvement |
 |--------|-------|----------|-------------|
-| commit gap mean (μs) | 30 | 750 | **96%** |
-| commit gap p50 (μs) | 20 | 689 | **97%** |
-| commit gap p99 (μs) | 314 | 2047 | 85% |
+| commit gap mean (μs) | 38.5 | 1062.5 | **96.3%** |
+| commit gap p50 (μs) | 30.7 | 828.9 | **96.3%** |
+| commit gap p99 (μs) | 180.9 | 4878.9 | 96.3% |
 
-**Conclusion:** With heterogeneous load, the barrier gives **95–97% improvement in commit atomicity**.
+**Conclusion:** With heterogeneous load, the barrier gives a **96% improvement in commit atomicity** (data is committed almost simultaneously).
 
 ### Test B: Determinism
 
@@ -68,16 +68,19 @@ Non-commutative updates, 1000 frames, 10 runs.
 
 **Conclusion:** For determinism, a barrier alone is insufficient — a **fixed commit order** is also required.
 
-### Test C: Throughput (no period)
+### Test C: Throughput (No Period)
 
-100 000 frames, 4 light measurements, no sleep/spin.
+100 000 frames, 4 light measurements, `target_period = 0` (no sleep/spin).
 
-| Version | Frames per second |
-|---------|-------------------|
-| Motor | (see `results/test_c_results.csv`) |
-| Baseline | (see `results/test_c_results.csv`) |
+| Version | Frames per second (fps) |
+|---------|-------------------------|
+| Motor | ~333 000 |
+| Baseline | ~11 000 000 |
 
-**Conclusion:** Barrier overhead is measured directly. For light work, it is typically < 5%.
+**Conclusion:** The synchronization barrier incurs a **significant overhead** (~33× slower) when the work is extremely light and no period is set.
+This is the cost of context switching (mutex/condvar) on every frame. 
+The barrier is designed for scenarios where **atomicity and determinism matter more than raw throughput** (e.g., Test A2). 
+If maximum throughput is needed without synchronization, use standard atomic operations instead.
 
 ## Quick Start
 
@@ -140,6 +143,10 @@ motorsync/
 ├── README.md
 └── LICENSE
 ```
+
+## Interactive Example: World Model
+
+Run world_model to see a synchronized 2D simulation with external input (press 1, 2, 3 to kick the balls).
 
 ## Theory Behind MotorSync
 
